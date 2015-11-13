@@ -1,0 +1,159 @@
+<!--
+@license
+Copyright (c) 2015 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+<script>
+
+(function() {
+  function interpolate(progress, points, fn, ctx) {
+    fn.apply(ctx, points.map(function(point) {
+      return point[0] + (point[1] - point[0]) * progress;
+    }));
+  }
+
+  Polymer.AppHeaderEffects = {};
+
+  /**
+   * Use this effect to fade in/out the background images in the header.
+   */
+  Polymer.AppHeaderEffects['fade-background'] = {
+    setUp: function fadeBackgroundSetUp() {
+      this._friction = parseFloat(this._styleProperties['--fade-background-friction']);
+      if (isNaN(this._friction)) {
+        this._friction = 0.8;
+      }
+      this.$.headerBg.style.height = (this.offsetHeight + this._friction * this._deltaHeight) + 'px';
+    },
+    tearDown: function() {
+      delete this._friction;
+    },
+    progress: function fadeBackgroundProgress(p, y) {
+      var friction = this._friction;
+      if (this.fixed) {
+        friction = -friction;
+      }
+      this.$.headerBg.style.opacity = 1 - p;
+      this.transform('translate3d(0px, ' + (y * friction) + 'px, 0px)', this.$.headerBg);
+    }
+  };
+
+  /**
+   * Use this effect to transform the main title into the condensed title.
+   */
+  Polymer.AppHeaderEffects['resize-title'] = {
+    setUp: function resizeTitleSetUp() {
+      var condensedTitle = Polymer.dom(this).querySelector('[condensed-title]');
+
+      if (!condensedTitle) {
+        throw new ReferenceError('You forgot to place an element with the ' +
+            '`condensed-title` attribute inside the header');
+      }
+      if (!this._title) {
+        throw new ReferenceError('You forgot to place an element with the ' +
+            '`title` attribute inside the header');
+      }
+
+      var titleClientRect = this._title.getBoundingClientRect();
+      var condensedTitleClientRect = condensedTitle.getBoundingClientRect();
+
+      this._scale = parseInt(window.getComputedStyle(condensedTitle)['font-size']) /
+          parseInt(window.getComputedStyle(this._title)['font-size']);
+      this._titleDX = titleClientRect.left - condensedTitleClientRect.left;
+      this._titleDY = titleClientRect.top - condensedTitleClientRect.top;
+      this._condensedTitle = condensedTitle;
+    },
+    tearDown: function resizeTitleTearDown() {
+       delete this._condensedTitle;
+       delete this._scale;
+       delete this._titleDX;
+       delete this._titleDY;
+    },
+    progress: function resizeTitleProgress(p, y) {
+      if (this.fixed) {
+        y = 0;
+      }
+      if (p >= 1) {
+        this._title.style.opacity = 0;
+        this._condensedTitle.style.opacity = 1;
+      } else {
+        this._title.style.opacity = 1;
+        this._condensedTitle.style.opacity = 0;
+      }
+
+      interpolate(Math.min(1, p), [
+        [1,  this._scale],
+        [0, -this._titleDX],
+        [y, y-this._titleDY]
+      ],
+      function(scale, translateX, translateY) {
+        this.transform('translate(' + translateX + 'px, ' + translateY + 'px) ' +
+            'scale3d(' + scale + ', ' + scale + ', 1)',
+            this._title);
+      }, this);
+    }
+  };
+
+  /**
+   * Use this effect to allow the title to transition to the condensed title quickly.
+   */
+  Polymer.AppHeaderEffects['snap-resized-title'] = {
+    setUp: function snapResizedTitleSetUp() {
+      var condensedTitle = Polymer.dom(this).querySelector('[condensed-title]');
+
+      if (!condensedTitle) {
+        throw new ReferenceError('You forgot to place an element with the' +
+            '`condensed-title` attribute inside the header');
+      }
+      if (!this._title) {
+        throw new ReferenceError('You forgot to place an element with the ' +
+            '`title` attribute inside the header');
+      }
+      this._condensedTitle = Polymer.dom(this).querySelector('[condensed-title]');
+      this._title.style.transition = 'opacity 0.2s';
+      condensedTitle.style.transition = 'opacity 0.2s';
+
+      if (!condensedTitle) {
+        throw new ReferenceError('invalid');
+      }
+    },
+    tearDown: function snapResizedTitleTearDown() {
+      delete this._condensedTitle;
+      this._title.style.transition = '';
+      this._condensedTitle.style.transition = '';
+    },
+    progress: function snapResizedTitleProgress(p, y) {
+      if (y > this._deltaHeight * 0.2) {
+        this._title.style.opacity = 0;
+        this._condensedTitle.style.opacity = 1;
+      } else {
+        this._title.style.opacity = 1;
+        this._condensedTitle.style.opacity = 0;
+      }
+
+      this.transform('translate(0px, ' + y + 'px)', this._title);
+    }
+  };
+
+  /**
+   * Use this effect to dynamically display a shadow below the header.
+   */
+  Polymer.AppHeaderEffects['waterfall'] = {
+    setUp: Function(),
+    tearDown: Function(),
+    progress: function waterfallProgress(p, y) {
+      if (this.fixed) {
+        this.shadow = (y > 0);
+      } else {
+        this.shadow = (y >= this._deltaHeight && y < this._headerDy);
+      }
+    }
+  };
+
+})();
+
+</script>
